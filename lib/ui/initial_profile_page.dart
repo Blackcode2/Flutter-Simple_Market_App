@@ -14,6 +14,7 @@ class InitialUserNamePage extends StatelessWidget {
   FirebaseFirestore firestore = FirebaseFirestore.instance;
   final _auth = FirebaseAuth.instance;
 
+  // instead of using setStates, use provider
   late ImagePickerProvider _imagePickerProvider;
   XFile? image;
   final ImagePicker _picker = ImagePicker();
@@ -21,21 +22,29 @@ class InitialUserNamePage extends StatelessWidget {
   final _formKey = GlobalKey<FormState>();
 
   Future<void> setName(String name, XFile? image) async {
-    await firestore
-        .collection('users')
-        .doc("displayedName")
-        .update({_auth.currentUser!.uid: name});
+    final userDocument = firestore.collection('users').doc("displayedName");
+
+    // Update user's displayed name in Firestore
+    await userDocument.update({_auth.currentUser!.uid: name});
+
+    // Update user's display name in Authentication
     await _auth.currentUser!.updateDisplayName(name);
 
+    // Check if there's an image to update
     if (image != null) {
       final refImage = FirebaseStorage.instance
           .ref()
           .child("profileImages")
           .child("${_auth.currentUser!.uid}.png");
+
+      // Upload the new image to Firebase Storage
       await refImage.putFile(File(image.path));
+
+      // Get the image URL and update the user's profile photo
       final uri = await refImage.getDownloadURL();
       await _auth.currentUser!.updatePhotoURL(uri);
     } else {
+      // Use a default image if no new image is provided
       final refImage = FirebaseStorage.instance
           .ref()
           .child("profileImages")
@@ -62,7 +71,10 @@ class InitialUserNamePage extends StatelessWidget {
                 radius: 50.0,
                 backgroundColor: const Color.fromARGB(255, 218, 214, 214),
                 child: _imagePickerProvider.image != null
-                    ? Image.file(File(_imagePickerProvider.image!.path))
+                    ? Image.file(
+                        File(_imagePickerProvider.image!.path),
+                        fit: BoxFit.fill,
+                      )
                     : const Icon(
                         Icons.account_circle_outlined,
                         size: 100,
@@ -108,7 +120,8 @@ class InitialUserNamePage extends StatelessWidget {
                             (value) {
                               firestore
                                   .collection('users')
-                                  .doc(_auth.currentUser!.uid);
+                                  .doc(_auth.currentUser!.uid)
+                                  .collection('chats');
                               Navigator.pushAndRemoveUntil(
                                   context,
                                   MaterialPageRoute(
@@ -120,7 +133,7 @@ class InitialUserNamePage extends StatelessWidget {
                         }
                         return null;
 
-                        // 서버로 보내고 중복 닉네임이 있는지 확인
+                        // send name to the server and check duplicate
                       },
                     ),
                   ],
@@ -137,6 +150,7 @@ class InitialUserNamePage extends StatelessWidget {
           children: [
             ElevatedButton(
                 onPressed: () {
+                  // to check duplicate, search 'users' doc
                   firestore
                       .collection('users')
                       .doc("displayedName")

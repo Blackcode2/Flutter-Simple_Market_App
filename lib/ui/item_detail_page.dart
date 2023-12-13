@@ -8,6 +8,7 @@ import 'package:firebase_auth/firebase_auth.dart' hide EmailAuthProvider;
 import 'main_page.dart';
 import 'post_page.dart';
 import 'chat_room_page.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 
 class ItemDetailPage extends StatefulWidget {
   ItemDetailPage({required this.doc, super.key});
@@ -25,15 +26,15 @@ class _ItemDetailPageState extends State<ItemDetailPage> {
 
   @override
   Widget build(BuildContext context) {
-    final CarouselController controller = CarouselController();
     Size size = MediaQuery.of(context).size;
+
+    final CarouselController controller = CarouselController();
     _dotsIndicatorProvider =
         Provider.of<DotsIndicatorProvider>(context, listen: true);
 
-    List imgsList = widget.doc['imgs'].toList();
-
+    List imgUri = widget.doc['imgs'].toList();
     List imgList = [];
-    for (var uri in imgsList) {
+    for (var uri in imgUri) {
       imgList.add(Image.network(uri));
     }
 
@@ -67,7 +68,7 @@ class _ItemDetailPageState extends State<ItemDetailPage> {
                                 thickness: 1,
                               ),
                               TextButton(
-                                child: const Text('Done!'),
+                                child: const Text('Cancel'),
                                 onPressed: () => Navigator.pop(context),
                               )
                             ],
@@ -192,111 +193,125 @@ class _ItemDetailPageState extends State<ItemDetailPage> {
               const SizedBox(
                 width: 10.0,
               ),
-              Text(
-                '\$${widget.doc['price']}',
-                style: const TextStyle(
-                  fontSize: 18.0,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              SizedBox(
-                width: size.width * 0.43,
-              ),
-              ElevatedButton(
-                // Button to start chatting
-                onPressed: () async {
-                  late bool isChatRoomExist;
-                  late String chatId;
-                  await firestore
-                      .collection('users')
-                      .doc(_auth.currentUser!.uid)
-                      .collection('chats')
-                      .doc(widget.doc['uid'])
-                      .get()
-                      .then((value) {
-                    isChatRoomExist = value.exists;
-                    if (value.exists) {
-                      chatId = value.get('chatId');
-                    }
-                  });
+              Expanded(
+                child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        '\$${widget.doc['price']}',
+                        style: const TextStyle(
+                          fontSize: 18.0,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      ElevatedButton(
+                        // Button to start chatting
+                        onPressed: () async {
+                          late bool isChatRoomExist;
+                          late String chatId;
 
-                  if (isChatRoomExist) {
-                    await firestore
-                        .collection('chats')
-                        .doc(chatId)
-                        .get()
-                        .then((value) {
-                      if (!mounted) return;
-                      Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (context) => ChatRoom(doc: value)));
-                    });
+                          // check wether there is existing chatting room.
+                          await firestore
+                              .collection('users')
+                              .doc(_auth.currentUser!.uid)
+                              .collection('chats')
+                              .doc(widget.doc['uid'])
+                              .get()
+                              .then((value) {
+                            isChatRoomExist = value.exists;
+                            if (value.exists) {
+                              chatId = value.get('chatId');
+                            }
+                          });
 
-                    // 기존 챗룸으로
-                  } else {
-                    final chatId = firestore
-                        .collection('chats')
-                        .doc()
-                        .id; // chats 콜렉션에 새로운 랜덤 도큐멘트 생성
+                          if (isChatRoomExist) {
+                            await firestore
+                                .collection('chats')
+                                .doc(chatId)
+                                .get()
+                                .then((value) {
+                              if (!mounted) return;
+                              Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                      builder: (context) =>
+                                          ChatRoom(doc: value)));
+                            });
+                          } else {
+                            final chatId = firestore
+                                .collection('chats')
+                                .doc()
+                                .id; // radom doucment in chats collection
 
-                    //생긴 채팅방 도큐먼트에 판매자와 구매자 정보 입력
-                    await firestore.collection('chats').doc(chatId).set({
-                      'sellerUid': widget.doc['uid'],
-                      'sellerDisplayName': widget.doc['displayName'],
-                      'buyerUid': _auth.currentUser!.uid,
-                      'buyerDisplayName': _auth.currentUser!.displayName,
-                    });
+                            //selller and buyer information
+                            await firestore
+                                .collection('chats')
+                                .doc(chatId)
+                                .set({
+                              'sellerUid': widget.doc['uid'],
+                              'sellerDisplayName': widget.doc['displayName'],
+                              'buyerUid': _auth.currentUser!.uid,
+                              'buyerDisplayName':
+                                  _auth.currentUser!.displayName,
+                            });
 
-                    late DocumentSnapshot<Map<String, dynamic>>? doc;
-                    await firestore
-                        .collection('chats')
-                        .doc(chatId)
-                        .collection('chat')
-                        .doc()
-                        .get()
-                        .then((value) {
-                      doc = value;
-                    });
+                            // information about people who are in chat room should be passed as parameter to chat room.
+                            late DocumentSnapshot<Map<String, dynamic>>? doc;
+                            await firestore
+                                .collection('chats')
+                                .doc(chatId)
+                                .get()
+                                .then((value) => doc = value);
+                            // await firestore
+                            //     .collection('chats')
+                            //     .doc(chatId)
+                            //     .collection('chat')
+                            //     .doc()
+                            //     .get()
+                            //     .then((value) {
+                            //   doc = value;
+                            // });
 
-                    // 구매자의 users collection에 채팅방 uid 저장
-                    firestore
-                        .collection('users')
-                        .doc(_auth.currentUser!.uid)
-                        .collection('chats')
-                        .doc(widget.doc['uid'])
-                        .set({
-                      'chatId': chatId,
-                    });
+                            // save the chat room id in the buyer's 'users' collection
+                            firestore
+                                .collection('users')
+                                .doc(_auth.currentUser!.uid)
+                                .collection('chats')
+                                .doc(widget.doc['uid'])
+                                .set({
+                              'chatId': chatId,
+                            });
 
-                    //판매자의 users collection에 채팅방 uid 저장
-                    firestore
-                        .collection('users')
-                        .doc(widget.doc['uid'])
-                        .collection('chats')
-                        .doc(_auth.currentUser!.uid)
-                        .set({
-                      'chatId': chatId,
-                    });
+                            //save the chat room id in the seller's 'users' collection
+                            firestore
+                                .collection('users')
+                                .doc(widget.doc['uid'])
+                                .collection('chats')
+                                .doc(_auth.currentUser!.uid)
+                                .set({
+                              'chatId': chatId,
+                            });
 
-                    if (!mounted) return;
-                    Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (context) => ChatRoom(doc: doc)));
-                  }
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFA83918),
-                ),
-                child: const Text(
-                  'Chat',
-                  style: TextStyle(
-                    fontSize: 16.0,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
+                            if (!mounted) return;
+                            Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (context) => ChatRoom(doc: doc)));
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFA83918),
+                        ),
+                        child: const Text(
+                          'Chat',
+                          style: TextStyle(
+                            fontSize: 16.0,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ]),
               ),
             ],
           ),
@@ -318,6 +333,7 @@ class DeleteEditButton extends StatefulWidget {
 
 class _DeleteEditButtonState extends State<DeleteEditButton> {
   FirebaseFirestore firestore = FirebaseFirestore.instance;
+  FirebaseStorage refImage = FirebaseStorage.instance;
 
   @override
   Widget build(BuildContext context) {
@@ -374,6 +390,16 @@ class _DeleteEditButtonState extends State<DeleteEditButton> {
                     .collection('items')
                     .doc(widget.doc['item'])
                     .delete();
+                await refImage
+                    .ref()
+                    .child("productImg")
+                    .child(widget.doc['item'])
+                    .listAll()
+                    .then((value) {
+                  for (Reference item in value.items) {
+                    FirebaseStorage.instance.ref(item.fullPath).delete();
+                  }
+                });
                 if (!mounted) return;
                 Navigator.pushAndRemoveUntil(
                     context,

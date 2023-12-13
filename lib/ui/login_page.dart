@@ -27,13 +27,6 @@ class Authentication extends StatelessWidget {
               providers: [
                 EmailAuthProvider(),
               ],
-              sideBuilder: (context, constraints) {
-                return Container(
-                  height: 100,
-                  width: 100,
-                  color: Colors.black,
-                );
-              },
               footerBuilder: (context, action) {
                 return ElevatedButton(
                     onPressed: () {

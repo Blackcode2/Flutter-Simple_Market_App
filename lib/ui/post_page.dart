@@ -21,8 +21,6 @@ class _PostPageState extends State<PostPage> {
   FirebaseFirestore firestore = FirebaseFirestore.instance;
   final _auth = FirebaseAuth.instance;
 
-  XFile? image;
-
   final ImagePicker _picker = ImagePicker();
 
   final _formKey = GlobalKey<FormState>();
@@ -60,7 +58,7 @@ class _PostPageState extends State<PostPage> {
               onPressed: () async {
                 if (_formKey.currentState!.validate()) {
                   if (_imagePickerProvider.pickedImgs!.isEmpty) {
-                    // 사진을 업로드 하지 않았을때 스낵바로 경고
+                    // when there are no pictures uploaed, warn it.
                     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
                       content: Text('Please, upload picture of your product.'),
                       duration: Duration(seconds: 4),
@@ -79,7 +77,9 @@ class _PostPageState extends State<PostPage> {
                             ],
                           );
                         });
-                    //firebase doc 이름을 uid와 시간 조합으로 저장
+                    // Set the name of the Firestore document
+                    // by combining the user's displayed name with the current time
+                    // for effective and unique document identification.
                     now = DateTime.now();
                     formatDate = DateFormat('yyyMMMdHmms').format(now);
                     await firestore
@@ -121,9 +121,7 @@ class _PostPageState extends State<PostPage> {
                   GestureDetector(
                     onTap: () async {
                       final List<XFile> images = await _picker.pickMultiImage();
-                      setState(() {
-                        _imagePickerProvider.pickedImgs = images;
-                      });
+                      _imagePickerProvider.pickedImgs = images;
                     },
                     child: Container(
                       height: size.height,
@@ -248,7 +246,7 @@ class _PostPageState extends State<PostPage> {
   }
 }
 
-// 수정을 위한 페이지
+// for update
 class UpdatePage extends StatefulWidget {
   UpdatePage({required this.imgList, required this.doc, super.key});
 
@@ -301,7 +299,7 @@ class _UpdatePageState extends State<UpdatePage> {
                 if (_formKey.currentState!.validate()) {
                   if (_imagePickerProvider.pickedImgs!.isEmpty &&
                       widget.imgList.isEmpty) {
-                    // 사진을 업로드 하지 않았을때 스낵바로 경고
+                    // when there are no pictures uploaed, warn it.
                     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
                       content: Text('Please, upload picture of your product.'),
                       duration: Duration(seconds: 4),
@@ -320,7 +318,6 @@ class _UpdatePageState extends State<UpdatePage> {
                             ],
                           );
                         });
-                    //firebase doc 이름을 uid와 시간 조합으로 저장
                     if (_imagePickerProvider.pickedImgs!.isNotEmpty) {
                       await uploadImg();
                     }
@@ -354,9 +351,7 @@ class _UpdatePageState extends State<UpdatePage> {
                   GestureDetector(
                     onTap: () async {
                       final List<XFile> images = await _picker.pickMultiImage();
-                      setState(() {
-                        _imagePickerProvider.pickedImgs = images;
-                      });
+                      _imagePickerProvider.pickedImgs = images;
                     },
                     child: Container(
                       height: size.height,
